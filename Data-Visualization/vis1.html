@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>World Map Chart</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">	
+	<script src="https://d3js.org/d3.v4.min.js"></script>
+	<script src="js/CountriesPopulationData.js"></script>
+	<script src="js/world-110m_geojson.js"></script>
+
+     <style type="text/css">
+         .names {
+             fill: none;
+             stroke: #fff;
+             stroke-linejoin: round;
+         }
+
+         .details {
+             color: white;
+         }
+
+         /* Slider css */
+         .slidecontainer {
+             width: 100%; /* Width of the outside container */
+             text-align: center;
+             margin: 5px;
+         }
+
+         /* The slider itself */
+         .slider {
+             margin-left: 5px;
+             margin-right: 5px;
+             width: 100%; /* Full-width */
+         }
+
+		 /* Mouse-over effects */
+		 .slider:hover {
+			 opacity: 1; /* Fully shown on mouse-over */
+		 }
+     </style>
+
+    <script>
+        var countiresPopData = [];
+        var populationById = {};
+        var chartData;
+        var selectedYear = 1950;
+
+		/* No need of it. as data already formated and copied in CountriesPopulationData.js file which is referenced
+        function formatData(popData) {
+            var formatedData = [];
+
+            if (popData != null && popData != undefined && popData.length > 0) {
+                var currentCountry = "";
+                var subCategories = [];
+                var countryData = null;
+
+                var newData = {};
+
+                for (var i = 0; i < popData.length; i++) {
+                    var countryDetail = {
+                        "Country": popData[i].Location,
+                        "PopMale": popData[i].PopMale,
+                        "PopFemale": popData[i].PopFemale,
+                        "PopTotal": popData[i].PopTotal,
+                        "id": popData[i].LocID
+                    };
+
+                    if (newData["Year_" + popData[i].Time] != null && newData["Year_" + popData[i].Time] != undefined) {
+                        newData["Year_" + popData[i].Time]["countries"].push(countryDetail);
+                    }
+                    else {
+                        newData["Year_" + popData[i].Time] = { "countries": [] };
+                        newData["Year_" + popData[i].Time]["countries"].push(countryDetail);
+                    }
+                }
+                
+                formatedData = newData;               
+                return formatedData;
+            }
+        }*/
+
+        // format csv data and read geojson data
+        function getDataFromAttachedFilesAndStart() {
+            
+			//var population = getCountriesPopulationData();
+			var data = getGEOJSONFromFile();
+			
+            countiresPopData = getCountriesPopulationData();//formatData(population);
+            chartData = data;
+
+            populationById = {};
+            selectedYearWorldPopulationData = countiresPopData["Year_" + selectedYear]["countries"];
+
+            selectedYearWorldPopulationData.forEach(function (d) {
+                populationById[d.id] = +d.PopTotal;
+
+            });
+            chartData.features.forEach(function (d) {
+                d.population = populationById[d.id];
+                d.numericID = d.id;
+            });
+
+           
+            drawWorldMapChart(selectedYearWorldPopulationData, "divMapChart", 1260, 620);
+        }
+        
+        function drawWorldMapChart(data, chartDivId, chartDivSizeWidth, chartDivSizeHeight) {
+            // reset old contents
+            document.getElementById("selectedYear").innerHTML = "World Population for year (" + selectedYear + ")";
+            document.getElementById(chartDivId).innerHTML = "";
+
+            var chartDiv = chartDivId;
+            var margin = { top: 20, right: 30, bottom: 30, left: 80 },
+                width = chartDivSizeWidth - margin.left - margin.right,
+                height = chartDivSizeHeight - margin.top - margin.bottom;
+
+            // generate svg
+            var svg = d3.select("#" + chartDivId)
+                .append("svg")
+                .attr("width", chartDivSizeWidth)
+               .attr("height", chartDivSizeHeight)
+               .attr('class', 'map');
+
+			// used to set size of drawing as per available width/height
+            var projection = d3.geoMercator()
+                   .scale(130)
+                  .translate([width / 2, height / 1.5]);
+
+			// generate color scale, Here we have specified range on which color applied from light to dark
+            var colorScale = d3.scaleThreshold()
+				.domain([100, 1000, 5000, 8000, 11000, 15000, 25000, 100000, 500000, 500000])
+				.range(["rgb(247,251,255)", "rgb(222,235,247)", "rgb(198,219,239)", "rgb(158,202,225)", "rgb(107,174,214)", "rgb(66,146,198)", "rgb(33,113,181)", "rgb(8,81,156)", "rgb(8,48,107)", "rgb(3,19,43)"]);
+
+            var path = d3.geoPath().projection(projection);
+
+            svg.append("g")
+			  .attr("class", "countries")
+			  .selectAll("path")
+			  .data(chartData.features)
+			  .enter().append("path")
+			  .attr("d", path)
+			  .style("fill", function (d) {
+					// fill country path according to their totalPop count and color scale
+					  var selectiveYearsCountriesData = countiresPopData["Year_" + selectedYear]["countries"];
+					  var selectedCountryPopDetail = null;
+					  for (var i = 0; i < selectiveYearsCountriesData.length; i++) {
+						  // as in geojson and our csv file it is different (csv contains "russian federation" and geojson contains "russia")
+						  if (d.properties.name.toLowerCase() == "russia") {
+							  if (selectiveYearsCountriesData[i].Country.toLowerCase() == "russian federation") {
+								  selectedCountryPopDetail = selectiveYearsCountriesData[i];
+								  break;
+							  }
+						  }
+						  else {
+							  if (selectiveYearsCountriesData[i].Country.toLowerCase() == d.properties.name.toLowerCase()) {
+								  selectedCountryPopDetail = selectiveYearsCountriesData[i];
+								  break;
+							  }
+						  }
+					  }
+					  if (selectedCountryPopDetail != undefined) {
+						  return colorScale(selectedCountryPopDetail.PopTotal);
+					  }
+					  else {
+						  return colorScale(0);
+					  }
+				  }
+				)
+			  .style('stroke', 'white')
+			  .style('stroke-width', 1.5)
+			  .style("opacity", 0.8)         
+            .style("stroke", "white")
+            .style('stroke-width', 0.3)
+            .on('mouseover', function (d) {               
+				// apply effect on mouseover to relevant country region
+                d3.select(this)
+                  .style("opacity", 1)
+                  .style("stroke", "white")
+                  .style("stroke-width", 3);
+            })
+            .on('mouseout', function (d) {
+               // apply effect on mouseover to relevant country region
+                d3.select(this)
+                  .style("opacity", 0.8)
+                  .style("stroke", "white")
+                  .style("stroke-width", 0.3);
+            })
+			.append("title")
+			.attr("class","d3-tip")
+			.style("color","red")
+			.style("stroke","green")
+			.style("fill","yellow")
+			.text(function (d) {
+			    var selectiveYearsCountriesData = countiresPopData["Year_" + selectedYear]["countries"];
+			    var selectedCountryPopDetail = null;
+			    for (var i = 0; i < selectiveYearsCountriesData.length; i++) {
+			        if (d.properties.name.toLowerCase() == "russia") {
+			            if (selectiveYearsCountriesData[i].Country.toLowerCase() == "russian federation") {
+			                selectedCountryPopDetail = selectiveYearsCountriesData[i];
+			                break;
+			            }
+			        }
+			        else {
+			            if (selectiveYearsCountriesData[i].Country.toLowerCase() == d.properties.name.toLowerCase()) {
+			                selectedCountryPopDetail = selectiveYearsCountriesData[i];
+			                break;
+			            }
+			        }
+			    }
+			    var yearPopulation = " YEAR (" + selectedYear + ") POPULATION\n\nCountry: "
+			    if (selectedCountryPopDetail != null) {
+			        return yearPopulation + d.properties.name + "\n\n Males Count: " + selectedCountryPopDetail.PopMale + " \n\n Female Count: " + selectedCountryPopDetail.PopFemale + " \n\n Total Population: " + selectedCountryPopDetail.PopTotal + "";
+			    }
+			    else {
+			        return yearPopulation + d.properties.name + "\n\n Males Count: 0 \n\n Female: 0 \n\n Total Population: 0";
+			    }
+			});
+        }
+
+        function redrawChart(year) {
+            selectedYear = year;
+            populationById = {};
+            selectedYearWorldPopulationData = countiresPopData["Year_" + selectedYear]["countries"];
+            selectedYearWorldPopulationData.forEach(function (d) {
+                populationById[d.id] = +d.PopTotal;
+            });
+            chartData.features.forEach(function (d) { d.population = populationById[d.id] });
+
+            drawWorldMapChart(selectedYearWorldPopulationData, "divMapChart", 1260, 620);
+        }
+
+		/* No need of it. as data already formated and copied in CountriesPopulationData.js file which is referenced
+        // Extract data from csv & geojson file
+        d3.queue()
+       .defer(d3.json, "http://enjalot.github.io/wwsd/data/world/world-110m.geojson")
+       .defer(d3.csv, "population.csv")
+      .await(formatCSVFileData);
+	  */
+	  
+	  //getDataFromAttachedFilesAndStart();
+	  
+</script>
+
+</head>
+
+<body>
+    <p style="font-size:16px; font-weight:bold;">
+       World Map : Population density among countries, differentiate by male and female count
+    </p>
+    <div style="clear:both;"></div>
+    <div style="font-size:14px; font-weight:bold;">
+    Select Year:
+    </div> 
+    <div style="clear:both;"></div>
+    <div>
+        <div class="slidecontainer">
+            <div style="float:left;font-weight: bold;">(1950)</div>
+            <div style="float:left;width:80%;">
+            <input type="range" min="1950" max="2100" value="1950" step="1" class="slider" id="myRange" list="tickmarks" onchange="redrawChart(this.value)">
+            <datalist id="tickmarks">
+                <option value="1950" label="1950">
+                <option value="1951">
+                <option value="1952">
+                <option value="1953">
+                <option value="1954">
+                <option value="1955">
+                <option value="1956">
+                <option value="1957">
+                <option value="1958">
+                <option value="1959">
+                <option value="1960">
+                <option value="1961">
+                <option value="1962">
+                <option value="1963">
+                <option value="1964">
+                <option value="1965">
+                <option value="1966">
+                <option value="1967">
+                <option value="1968">
+                <option value="1969">
+                <option value="1970">
+                <option value="1971">
+                <option value="1972">
+                <option value="1973">
+                <option value="1974">
+                <option value="1975">
+                <option value="1976">
+                <option value="1977">
+                <option value="1978">
+                <option value="1979">
+                <option value="1980">
+                <option value="1981">
+                <option value="1982">
+                <option value="1983">
+                <option value="1984">
+                <option value="1985">
+                <option value="1986">
+                <option value="1987">
+                <option value="1988">
+                <option value="1989">
+                <option value="1990">
+                <option value="1991">
+                <option value="1992">
+                <option value="1993">
+                <option value="1994">
+                <option value="1995">
+                <option value="1996">
+                <option value="1997">
+                <option value="1998">
+                <option value="1999">
+                <option value="2000">
+                <option value="2001">
+                <option value="2002">
+                <option value="2003">
+                <option value="2004">
+                <option value="2005">
+                <option value="2006">
+                <option value="2007">
+                <option value="2008">
+                <option value="2009">
+                <option value="2010">
+                <option value="2011">
+                <option value="2012">
+                <option value="2013">
+                <option value="2014">
+                <option value="2015">
+                <option value="2016">
+                <option value="2017">
+                <option value="2018">
+                <option value="2019">
+                <option value="2020">
+                <option value="2021">
+                <option value="2022">
+                <option value="2023">
+                <option value="2024">
+                <option value="2025">
+                <option value="2026">
+                <option value="2027">
+                <option value="2028">
+                <option value="2029">
+                <option value="2030">
+                <option value="2031">
+                <option value="2032">
+                <option value="2033">
+                <option value="2034">
+                <option value="2035">
+                <option value="2036">
+                <option value="2037">
+                <option value="2038">
+                <option value="2039">
+                <option value="2040">
+                <option value="2041">
+                <option value="2042">
+                <option value="2043">
+                <option value="2044">
+                <option value="2045">
+                <option value="2046">
+                <option value="2047">
+                <option value="2048">
+                <option value="2049">
+                <option value="2050">
+                <option value="2051">
+                <option value="2052">
+                <option value="2053">
+                <option value="2054">
+                <option value="2055">
+                <option value="2056">
+                <option value="2057">
+                <option value="2058">
+                <option value="2059">
+                <option value="2060">
+                <option value="2061">
+                <option value="2062">
+                <option value="2063">
+                <option value="2064">
+                <option value="2065">
+                <option value="2066">
+                <option value="2067">
+                <option value="2068">
+                <option value="2069">
+                <option value="2070">
+                <option value="2071">
+                <option value="2072">
+                <option value="2073">
+                <option value="2074">
+                <option value="2075">
+                <option value="2076">
+                <option value="2077">
+                <option value="2078">
+                <option value="2079">
+                <option value="2080">
+                <option value="2081">
+                <option value="2082">
+                <option value="2083">
+                <option value="2084">
+                <option value="2085">
+                <option value="2086">
+                <option value="2087">
+                <option value="2088">
+                <option value="2089">
+                <option value="2090">
+                <option value="2091">
+                <option value="2092">
+                <option value="2093">
+                <option value="2094">
+                <option value="2095">
+                <option value="2096">
+                <option value="2097">
+                <option value="2098">
+                <option value="2099">
+                <option value="2100">
+            </datalist>
+                </div>
+            <div  style="float:left;margin-left: 10px;font-weight: bold;">(2100)</div>
+        </div>
+    </div>
+    <div style="clear:both;"></div>
+    <div id="selectedYear" style="font-size:16px; font-weight:bold; text-align:center; color: green;
+    margin-bottom: 3px;">
+          
+    </div>
+    
+    <div style="clear:both;"></div>
+	<div id="divMapChart" style="border:1px solid lightgrey;"></div>
+    <div style="clear:both;"></div>
+
+<script>
+	getDataFromAttachedFilesAndStart();
+</script>
+</body>
+</html>

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Multi Series Line Chart - Population Survey</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+
+    <style type="text/css">
+        pie {
+            margin: 20px;
+        }
+
+        .pie text {
+            font-family: "Verdana";
+            fill: #888;
+        }
+
+        .pie .name-text {
+            font-size: 1em;
+        }
+
+        .pie .value-text {
+            font-size: 3em;
+        }
+    </style>
+
+    <script>
+        var countriesInternetUsageData = [];
+        var yearsList = [];
+        var countriesNameList = [];
+
+        function formatData(internetUsageData) {
+            var formatedData = [];
+
+            if (internetUsageData != null && internetUsageData != undefined && internetUsageData.length > 0) {
+                for (var i = 0; i < internetUsageData.length; i++) {
+                    var countryUsageDetail = {
+                        "Country": internetUsageData[i]["Country Name"]
+                    };
+                    // populate countries list
+                    countriesNameList.push(internetUsageData[i]["Country Name"]);
+
+                    for (var j = 1960; j < 2018; j++) {
+                        // initialize yearsList once only
+                        if (i == 0) {
+                            yearsList.push(j);
+                        }
+                        if (internetUsageData[i][j] != undefined && internetUsageData[i][j] != null) {
+                            if (internetUsageData[i][j].length == 0) {
+                                countryUsageDetail["Year_" + j] = 0;
+                            }
+                            else {
+                                countryUsageDetail["Year_" + j] = +internetUsageData[i][j];
+                            }
+                        }
+                        else {
+                            countryUsageDetail["Year_" + j] = 0;
+                        }
+                    }
+
+                    formatedData.push(countryUsageDetail);
+                }
+                return formatedData;
+            }
+        }
+
+        function formatCSVFileData(errors, popData) {
+            if (errors) {
+                console.error('Error getting or parsing the data.');
+                throw erros;
+            }
+            countriesInternetUsageData = formatData(popData);
+            //console.log(JSON.stringify(countriesInternetUsageData));
+
+            pupoluateDropDownlists();
+            createDonutChart();
+        }
+
+        // Populate data from csv file
+        d3.queue()
+        .defer(d3.csv, "net_modified1.csv")
+       .await(formatCSVFileData);
+
+        // method called on change from countries dropdown list
+        function createDonutChart() {
+            var countriesDropDownlist = document.getElementById("countriesList");
+            var yearsDropDownlist = document.getElementById("yearsList");
+
+            var selectedCountry = countriesDropDownlist.options[countriesDropDownlist.selectedIndex].value;
+            var selectedYear = yearsDropDownlist.options[yearsDropDownlist.selectedIndex].value;
+
+            // Show selected usage by country name
+            document.getElementById("selectedCountryName").innerHTML = "Internet Usage of Country '" + selectedCountry + "' with Total Population in year '" + selectedYear+"'";
+            
+            // filter relevant country data
+            var extractSelectedCountryDetail = null;
+            for (var i = 0; i < countriesInternetUsageData.length; i++) {
+                if (countriesInternetUsageData[i].Country == selectedCountry) {
+                    extractSelectedCountryDetail = countriesInternetUsageData[i];
+                    break;
+                }
+            }
+
+            var data = [
+                  { name: extractSelectedCountryDetail.Country, value: +extractSelectedCountryDetail["Year_" + selectedYear] },
+                  { name: "Total Population", value: 0 },
+            ];
+
+            // Find remaining world population count
+            data[1].value = 100-data[0].value;
+
+           // alert(JSON.stringify(data));
+
+            // draw chart on required data
+            drawChartForData(data, "divDonutChart", 1350, 410);
+        }
+
+        function drawChartForData(data, chartDivId, chartDivSizeWidth, chartDivSizeHeight) {
+            // reset old contents
+            document.getElementById(chartDivId).innerHTML = "";
+
+            var chartDiv = chartDivId;
+            var margin = { top: 10, right: 20, bottom: 10, left: 20 },
+               width = chartDivSizeWidth - margin.left - margin.right,
+               height = chartDivSizeHeight - margin.top - margin.bottom;
+
+            // generate svg
+            
+
+            // generate scales
+            var xScale = d3.scaleBand().rangeRound([0, width], 0, 0),
+               yScale = d3.scaleLinear().range([height, 0]),
+               colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+            var text = "";
+            var thickness = 55;
+            var duration = 750;
+
+            var radius = Math.min(width, height) / 2;
+            var colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+            var svg = d3.select("#" + chartDivId)
+                .append("svg")
+                .attr('class', 'pie')
+                .attr("width", chartDivSizeWidth)
+               .attr("height", chartDivSizeHeight)
+               .append("g")
+            .attr('transform', 'translate(' + (width/2) + ',' + (height/2) + ')');
+            //.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+            /*
+            var svg = d3.select("#chart")
+            .append('svg')
+            .attr('class', 'pie')
+            .attr('width', width)
+            .attr('height', height);
+
+            var g = svg.append('g')
+            .attr('transform', 'translate(' + (width/2) + ',' + (height/2) + ')');
+            */
+
+            var arc = d3.arc()
+            .innerRadius(radius - thickness)
+            .outerRadius(radius);
+
+            var pie = d3.pie()
+            .value(function(d) { return d.value; })
+            .sort(null);
+
+            var path = svg.selectAll('path')
+            .data(pie(data))
+            .enter()
+            .append("g")
+            .on("mouseover", function(d) {
+                // hide default text
+                d3.select(".defaultCountryLabel").style("opacity",0);
+                d3.select(".defaultCountryCount").style("opacity",0);
+
+                let g = d3.select(this)
+                  .style("cursor", "pointer")
+                  .style("fill", "black")
+                  .append("g")
+                  .attr("class", "text-group");
+ 
+                g.append("text")
+                  .attr("class", "name-text")
+                  .text(d.data.name)
+                    .attr('text-anchor', 'middle')
+                    .attr('dy', '-1.2em');
+  
+                g.append("text")
+                  .attr("class", "value-text")
+                  .text(d.data.value.toFixed(2)+"%")
+                .attr('text-anchor', 'middle')
+                .attr('dy', '.6em');
+            })
+            .on("mouseout", function(d) {
+                d3.select(this)
+                .style("cursor", "none")  
+                .style("fill", colorScale(d.data.name))
+                .select(".text-group").remove();
+
+                d3.select(".defaultCountryLabel").style("opacity",1);
+                d3.select(".defaultCountryCount").style("opacity",1);
+            })
+            .append('path')
+            .attr('d', arc)
+            .attr('fill', function(d,i){ 
+                return colorScale(d.data.name);
+            })
+            .on("mouseover", function(d) {
+                d3.select(this)     
+                .style("cursor", "pointer")
+                .style("fill", "black");
+            })
+            .on("mouseout", function(d) {
+                d3.select(this)
+                .style("cursor", "none")  
+                .style("fill", colorScale(d.data.name));
+            })
+            .each(function(d, i) { 
+                this._current = i;
+            });
+
+            // By default show relevant country count inside of chart
+            /*
+            svg.append('text')
+              .attr('text-anchor', 'middle')
+              .attr('dy', '.35em')
+              .text(text);
+              */
+            var centeroidLabelGroup = svg//d3.select(this)
+                  //.style("cursor", "pointer")
+                  //.style("fill", "black")
+                  .append("g")
+                  .attr("class", "text-group");
+ 
+            centeroidLabelGroup.append("text")
+              .attr("class", "name-text defaultCountryLabel")
+              .text(data[0].name)
+                .attr('text-anchor', 'middle')
+                .attr('dy', '-1.2em');
+  
+            centeroidLabelGroup.append("text")
+              .attr("class", "value-text defaultCountryCount")
+              .text(data[0].value.toFixed(2)+"%")
+            .attr('text-anchor', 'middle')
+            .attr('dy', '.6em');
+
+            
+            // Add legend 
+
+            
+            
+            svg.append("rect").attr("x", -100).attr("y",(7+ height/2)).attr("width", "30").attr("height", "15").style("fill", colorScale(data[1].name));
+            svg.append("text").attr("x", -60).attr("y", (17+height/2)).style("fill", "black").text(data[1].name)
+                .style("font-weight", "normal").style("font-size", "12px").style("font-family", "arial");
+
+            svg.append("rect").attr("x", 50).attr("y", (7+height/2)).attr("width", "30").attr("height", "15").style("fill", colorScale(data[0].name));
+            svg.append("text").attr("x", 95).attr("y", (17+height/2)).style("fill", "black").text((data[0].name))
+                .style("font-weight", "normal").style("font-size", "12px").style("font-family", "arial");
+
+            
+            /*
+            svg.append("rect").attr("x", -100).attr("y", (7+height/2)).attr("width", "30").attr("height", "15").style("fill", colorScale(data[0].name));
+            svg.append("text").attr("x", -60).attr("y", (17+height/2)).style("fill", "black").text((data[0].name))
+                .style("font-weight", "normal").style("font-size", "12px").style("font-family", "arial");
+
+            
+            svg.append("rect").attr("x", 0).attr("y",(7+ height/2)).attr("width", "30").attr("height", "15").style("fill", colorScale(data[1].name));
+            svg.append("text").attr("x", 45).attr("y", (17+height/2)).style("fill", "black").text(data[1].name)
+                .style("font-weight", "normal").style("font-size", "12px").style("font-family", "arial");
+            */
+        }
+
+        function pupoluateDropDownlists() {
+            // initialize countries dropdownlist
+            var selectCountries = document.getElementById('countriesList');
+
+            for (var i = 0; i < countriesNameList.length; i++) {
+                var opt = document.createElement('option');
+                opt.innerHTML = countriesNameList[i];
+                opt.value = countriesNameList[i];
+                selectCountries.appendChild(opt);
+            }
+
+            // initialize years dropdownlist
+            var selectYears = document.getElementById('yearsList');
+
+            for (var i = 0; i < yearsList.length; i++) {
+                var opt = document.createElement('option');
+                opt.innerHTML = yearsList[i];
+                opt.value = yearsList[i];
+                selectYears.appendChild(opt);
+            }
+        }
+    </script>
+
+</head>
+
+<body>
+    <p style="font-size: 16px; font-weight: bold;">
+        Donut Chart : Internet utilization by country
+    </p>
+    <div style="clear: both;"></div>
+    <div style="font-size: 14px; font-weight: bold; margin: 7px;">
+        Select Country:
+    </div>
+    <div style="clear: both;"></div>
+    <div style="margin-left: 7px;">
+        <select id="countriesList" onchange="createDonutChart()" style="height: 27px;"></select>
+    </div>
+    <div style="clear: both;"></div>
+    <div style="font-size: 14px; font-weight: bold; margin: 7px;">
+        Select Year:
+    </div>
+    <div style="clear: both;"></div>
+    <div style="margin-left: 7px;">
+        <select id="yearsList" onchange="createDonutChart()" style="height: 27px;width:150px;"></select>
+    </div>
+    <div style="clear: both;"></div>
+    <div id="selectedCountryName" style="margin: 10px; font-size: 20px; font-weight: bold; text-align: center; color: blue;text-decoration: underline;
+    padding-bottom: 5px;">
+    </div>
+
+    <div style="clear: both;"></div>
+    <div id="divDonutChart" ></div>
+    <div style="clear: both;"></div>
+</body>
+</html>
+
+<script>
+    // get data from js file
+    //countiresPopData = getCountriesPopulationData();
+    ///pupoluateCountriesDropDownlist(countiresPopData);
+</script>

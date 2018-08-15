@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Multi Series Line Chart - Population Survey</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">	
+	<script src="https://d3js.org/d3.v4.min.js"></script>
+
+    <style type="text/css">
+        
+        .line {
+          fill: none;
+          stroke: steelblue;
+          stroke-width: 1.5px;
+        }
+
+        text {
+            font-weight: bold;
+        }
+
+        .tick {
+            /*fill: none;
+            stroke: #666;*/
+            shape-rendering: crispEdges;
+            /*stroke-dasharray: 2,2;*/
+        }
+	</style>
+</head>
+
+<body>
+<div>
+</div>
+    <p style="font-size:16px; font-weight:bold;">
+	
+        Line Graph : Comparision between past growth and future growth in population for individual country
+
+    </p>
+    <div style="clear:both;"></div>
+    <div style="font-size:14px; font-weight:bold;">
+    Select Country:
+    </div> 
+    <div style="clear:both;"></div>
+    <div>
+    <select id="countriesList"  onchange="createLineCharts()"></select>    
+    </div>
+    <div style="clear:both;"></div>
+    <div id="selectedCountryName" style="margin:10px; font-size:16px; font-weight:bold; text-align:center; color:blue;">
+        
+    </div>
+    
+    <div style="clear:both;"></div>
+	<div id="divPastDataChart" style="border:1px solid lightgrey;"></div>
+    <div style="clear:both;"></div>
+    <div id="selectedCountryNameFuture" style="margin:10px; font-size:16px; font-weight:bold; text-align:center;color:blue;">
+        
+    </div>
+    <div style="clear:both;"></div>
+    <div id="divFutureDataChart" style="border:1px solid lightgrey;"></div>    
+     <script>
+         var countiresPopData = [];
+
+         
+         function formatData(popData) {
+             var formatedData = [];
+
+             if (popData != null && popData != undefined && popData.length > 0) {
+                 var currentCountry = "";
+                 var subCategories = [];
+                 var countryData = null;
+
+                 for (var i = 0; i < popData.length; i++) {
+                     if (i == 0) {
+                         currentCountry = popData[i].Location;
+                         countryData = {
+                             "country": popData[i].Location,
+                             "subCategory": []
+                         };
+                         var yearDetail = {
+                             "Year": popData[i].Time,
+                             "PopMale": popData[i].PopMale,
+                             "PopFemale": popData[i].PopFemale,
+                             "PopTotal": popData[i].PopTotal
+                         };
+                         countryData.subCategory.push(yearDetail);
+                     }
+                     else {
+                         if (popData[i].Location.toLowerCase() != currentCountry.toLowerCase()) { // new country come
+
+                             formatedData.push(countryData);
+
+                             countryData = null;
+                             countryData = {
+                                 "country": popData[i].Location,
+                                 "subCategory": []
+                             };
+                             var yearDetail = {
+                                 "Year": popData[i].Time,
+                                 "PopMale": popData[i].PopMale,
+                                 "PopFemale": popData[i].PopFemale,
+                                 "PopTotal": popData[i].PopTotal
+                             };
+                             countryData.subCategory.push(yearDetail);
+                             currentCountry = popData[i].Location;
+                         }
+                         else {
+                             var yearDetail = {
+                                 "Year": popData[i].Time,
+                                 "PopMale": popData[i].PopMale,
+                                 "PopFemale": popData[i].PopFemale,
+                                 "PopTotal": popData[i].PopTotal
+                             };
+                             countryData.subCategory.push(yearDetail);
+                         }
+                     }
+                 }
+                 // insert last country data
+                 formatedData.push(countryData);
+                 return formatedData;
+             }
+         }
+         
+         function formatCSVFileData(errors, popData) {
+             if (errors) {
+                 console.error('Error getting or parsing the data.');
+                 throw erros;
+             }
+             countiresPopData = formatData(popData);
+             pupoluateCountriesDropDownlist(countiresPopData);
+         }
+
+          d3.queue()
+          .defer(d3.csv, "population.csv")
+         .await(formatCSVFileData);
+
+         // method called on change from countries dropdown list
+         function createLineCharts() {
+             var countriesDropDownlist = document.getElementById("countriesList");            
+             
+             var selectedCountry = countriesDropDownlist.options[countriesDropDownlist.selectedIndex].value;
+
+             if (selectedCountry == "-1") {
+                 alert("Please select valid country");
+                 return;
+             }
+
+             // Show selected country name
+             document.getElementById("selectedCountryName").innerHTML = "Population Trend of: " + selectedCountry + "  (1950-2018) ";
+             document.getElementById("selectedCountryNameFuture").innerHTML = "Population Trend of: " + selectedCountry + "  (2019-2100) ";
+
+             // filter relevant country data
+             var selectedCountryPopulationData = null;
+             for (var i = 0; i < countiresPopData.length; i++) {
+                 if (countiresPopData[i].country == selectedCountry) {
+                     selectedCountryPopulationData = countiresPopData[i].subCategory;
+                     break;
+                 }
+             }
+
+             var countryPopPastYearsData = [], countryPopFutureYearsData = [];
+             for (var i = 0; i < selectedCountryPopulationData.length; i++) {
+                 if (+selectedCountryPopulationData[i].Year <= 2018) {
+                     countryPopPastYearsData.push(selectedCountryPopulationData[i]);
+                 }
+                 else {
+                     countryPopFutureYearsData.push(selectedCountryPopulationData[i]);
+                 }
+             }
+             
+             drawChartForData(countryPopPastYearsData, "divPastDataChart", 1350, 230);
+             drawChartForData(countryPopFutureYearsData, "divFutureDataChart", 1350, 230);
+         }
+
+         function drawChartForData(data, chartDivId, chartDivSizeWidth, chartDivSizeHeight) {
+             // reset old contents
+             document.getElementById(chartDivId).innerHTML = "";
+
+             var chartDiv = chartDivId;
+             var margin = { top: 20, right: 30, bottom: 30, left: 80 },
+                width = chartDivSizeWidth - margin.left - margin.right,
+                height = chartDivSizeHeight - margin.top - margin.bottom;
+
+             // generate svg
+             var svg = d3.select("#" + chartDivId)
+                 .append("svg")
+                 .attr("width", chartDivSizeWidth)
+                .attr("height", chartDivSizeHeight)
+                .append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+             // generate scales
+             var xScale = d3.scaleBand().rangeRound([0, width],0,0),
+                yScale = d3.scaleLinear().range([height, 0]),
+                colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+             var maximumPopulationCount = d3.max(data, function (d) { return +d.PopTotal; });
+             //console.log(maximumPopulationCount);
+                 
+             // update scales domains
+             yScale.domain([0, maximumPopulationCount]);
+             xScale.domain(data.map(function (d) {
+                 return d.Year;
+             }));
+             
+             // define the popMaleLine line
+             var popMaleLine = d3.line()
+                 .x(function (d) { return xScale(d.Year); })
+                 .y(function (d) { return yScale(d.PopMale); });
+
+             // define the popFemaleLine line
+             var popFemaleLine = d3.line()
+                 .x(function (d) { return xScale(d.Year); })
+                 .y(function (d) { return yScale(d.PopFemale); });
+
+             // define the totalPopLine line
+             var totalPopLine = d3.line()
+                 .x(function (d) { return xScale(d.Year); })
+                 .y(function (d) { return yScale(d.PopTotal); });
+
+             // generate axis lines
+             svg.append("g")
+                .attr("class", "axis xaxis")
+                .attr("transform", "translate(0," + height + ")")
+                .call(d3.axisBottom(xScale));
+
+             svg.append("g")
+                 .attr("class", "axis axis--y yaxis")
+                 .call(d3.axisLeft(yScale))
+
+             // Add the popMaleLine path.
+             svg.append("path")
+                 //.data(data)
+                 .attr("class", "line")
+                 .style("stroke", colorScale("popMaleLine"))
+                 .attr("d", popMaleLine(data));
+
+             // Add the popFemaleLine path.
+             svg.append("path")
+                 //.data(data)
+                 .attr("class", "line")
+                 .style("stroke", colorScale("popFemaleLine"))
+                 .attr("d", popFemaleLine(data));
+
+             // Add the TotalPopLine path.
+             svg.append("path")
+                 //.data(data)
+                 .attr("class", "line")
+                 .style("stroke", colorScale("TotalPopLine"))
+                 .attr("d", totalPopLine(data));
+
+             // hide alternative tick label to remove cluttering
+             svg.selectAll(".xaxis").selectAll(".tick").attr("opacity", function (d, i) {
+                 if (i % 2 == 0) {
+                     return "1";
+                 }
+                 else {
+                     d3.select(this).select("text").style("opacity",0);
+                     return "1";
+                 }
+             });
+
+             // Add legend 
+             // male
+             svg.append("rect").attr("x", 10).attr("y", -10).attr("width", "30").attr("height", "4").style("fill", colorScale("popMaleLine"));
+             svg.append("text").attr("x", 45).attr("y", -6).style("fill", "black").text("Female")
+                 .style("font-weight", "normal").style("font-size", "12px").style("font-family", "arial");
+
+             // female
+             svg.append("rect").attr("x", 100).attr("y", -10).attr("width", "30").attr("height", "4").style("fill", colorScale("popFemaleLine"));
+             svg.append("text").attr("x", 135).attr("y", -6).style("fill", "black").text("Males")
+                 .style("font-weight", "normal").style("font-size", "12px").style("font-family", "arial");
+
+             // total pop
+             svg.append("rect").attr("x", 200).attr("y", -10).attr("width", "30").attr("height", "4").style("fill", colorScale("TotalPopLine"));
+             svg.append("text").attr("x", 235).attr("y", -6).style("fill", "black").text("Total Population")
+                 .style("font-weight", "normal").style("font-size", "12px").style("font-family", "arial");
+         }
+                  
+         function pupoluateCountriesDropDownlist(countriesList) {
+             var sel = document.getElementById('countriesList');
+
+             // Add select country option
+             var opt = document.createElement('option');
+             opt.innerHTML = "Select Country";
+             opt.value = "-1";
+             sel.appendChild(opt);
+
+             for (var i = 0; i < countriesList.length; i++) {
+                 var opt = document.createElement('option');
+                 opt.innerHTML = countriesList[i].country;
+                 opt.value = countriesList[i].country;
+                 sel.appendChild(opt);
+             }
+         } 
+</script>
+
+
+</body>
+</html>
+
+
