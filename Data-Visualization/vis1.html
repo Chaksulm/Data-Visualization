@@ -92,16 +92,6 @@
             populationById = {};
             selectedYearWorldPopulationData = countiresPopData["Year_" + selectedYear]["countries"];
 
-            selectedYearWorldPopulationData.forEach(function (d) {
-                populationById[d.id] = +d.PopTotal;
-
-            });
-            chartData.features.forEach(function (d) {
-                d.population = populationById[d.id];
-                d.numericID = d.id;
-            });
-
-           
             drawWorldMapChart(selectedYearWorldPopulationData, "divMapChart", 1260, 620);
         }
         
