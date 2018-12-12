@@ -46,39 +46,7 @@
         var chartData;
         var selectedYear = 1950;
 
-		/* No need of it. as data already formated and copied in CountriesPopulationData.js file which is referenced
-        function formatData(popData) {
-            var formatedData = [];
-
-            if (popData != null && popData != undefined && popData.length > 0) {
-                var currentCountry = "";
-                var subCategories = [];
-                var countryData = null;
-
-                var newData = {};
-
-                for (var i = 0; i < popData.length; i++) {
-                    var countryDetail = {
-                        "Country": popData[i].Location,
-                        "PopMale": popData[i].PopMale,
-                        "PopFemale": popData[i].PopFemale,
-                        "PopTotal": popData[i].PopTotal,
-                        "id": popData[i].LocID
-                    };
-
-                    if (newData["Year_" + popData[i].Time] != null && newData["Year_" + popData[i].Time] != undefined) {
-                        newData["Year_" + popData[i].Time]["countries"].push(countryDetail);
-                    }
-                    else {
-                        newData["Year_" + popData[i].Time] = { "countries": [] };
-                        newData["Year_" + popData[i].Time]["countries"].push(countryDetail);
-                    }
-                }
-                
-                formatedData = newData;               
-                return formatedData;
-            }
-        }*/
+		
 
         // format csv data and read geojson data
         function getDataFromAttachedFilesAndStart() {
